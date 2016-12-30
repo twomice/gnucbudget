@@ -1,0 +1,6 @@
+name = GnuCash Budgeting
+description = Tools for budgeting with GnuCash
+package = GnuCash
+core = 7.x
+version = "7.x-1.x-dev"
+
