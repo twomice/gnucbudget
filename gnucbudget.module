@@ -29,44 +29,63 @@ function gnucbudget_init() {
  */
 function _gnucbudget_var_get($key) {
   $vars = array(
-    'gnucbudget_transaction_date_min' => '2016-12-01',
+    'gnucbudget_transaction_history_months_max' => '6',
   );
   
   return $vars[$key];
 }
 
-function _gnucbudget_sync_gnucash_transactions() {
-  // Get all budget accounts for matching with their gnucash accounts
-  $account_ids_per_guid = array();
-  $query = new EntityFieldQuery();
-  $query->entityCondition('entity_type', 'account')
-    ->fieldCondition('field_type', 'value', 'budget', '=');
-  $results = $query->execute();
-  foreach (array_keys($results['account']) as $entity_id) {
-    $account = entity_load_single('account', $entity_id);
-    $gnucash_account_id = $account->field_gnucash_account[LANGUAGE_NONE][0]['target_id'];
-    $gnucash_account = entity_load_single('gnucash_account', $gnucash_account_id);
-    $gnucash_account_guid = $gnucash_account->field_gnucash_guid[LANGUAGE_NONE][0]['value'];
-    $account_ids_per_guid[$gnucash_account_guid] = $entity_id;
+function _gnucbudget_get_budget_accounts_to_guids_map() {
+  static $accounts_to_guids_map;
+  if (!isset($accounts_to_guids_map)) {
+    // Get all budget accounts for matching with their gnucash accounts
+    $accounts_to_guids_map = array();
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'account')
+      ->fieldCondition('field_type', 'value', 'budget', '=');
+    $results = $query->execute();
+    foreach (array_keys($results['account']) as $entity_id) {
+      $account = entity_load_single('account', $entity_id);
+      $gnucash_account_id = $account->field_gnucash_account[LANGUAGE_NONE][0]['target_id'];
+      $gnucash_account = entity_load_single('gnucash_account', $gnucash_account_id);
+      $gnucash_account_guid = $gnucash_account->field_gnucash_guid[LANGUAGE_NONE][0]['value'];
+      $accounts_to_guids_map[$gnucash_account_guid] = $entity_id;
+    }
   }
-  // Get ID of 'Expsnse' account
-  $query = new EntityFieldQuery();
-  $query->entityCondition('entity_type', 'account')
-    ->fieldCondition('field_type', 'value', 'expense', '=');
-  $results = $query->execute();
-  $expense_account = reset($results['account']);
-  $expense_account_id = $expense_account->id;
+  return $accounts_to_guids_map;
+}
 
+function _guncbudget_get_expense_account_id() {
+  static $expense_account_id;
+  if (!isset($expense_account_id)) {
+    // Get ID of 'Expense' account
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'account')
+      ->fieldCondition('field_type', 'value', 'expense', '=');
+    $results = $query->execute();
+    $expense_account = reset($results['account']);
+    $expense_account_id = $expense_account->id;
+  }
+  return $expense_account_id;
+}
+
+function _gnucbudget_sync_gnucash_transactions() {
   // Get activities from gnucash database.
-  // FIXME: this list will get huge over time; we should probably handle this on
-  // a per-month basis, to avoid eating memory in huge arrays.
+  for ($months_ago = _gnucbudget_var_get('gnucbudget_transaction_history_months_max'); $months_ago >= 0; $months_ago--) {
+    $month = date("Y-m", strtotime("-$months_ago month"));
+    _gnucbudget_sync_gnucash_transactions_month($month);
+  }
+
+}
+
+function _gnucbudget_sync_gnucash_transactions_month($month) {
   db_set_active('gnucash');
   $query = db_select('transactions', 't');
   $query->join('splits', 's', "s.tx_guid = t.guid");
   $query->join('accounts', 'a', "s.account_guid = a.guid AND a.account_type = :type", array(':type' => 'EXPENSE'));
   $query->fields('s', array('account_guid'))
-      ->fields('t', array('post_date', 'description', 'guid'))
-      ->condition('t.post_date', _gnucbudget_var_get('gnucbudget_transaction_date_min'), '>=');
+      ->fields('t', array('post_date', 'description', 'guid'));
+  $query->where('date_format(t.post_date, "%Y-%m") = :month', array(':month' => $month));
   $query->addExpression('round(s.value_num / s.value_denom, 2)', 'amount');
   $result = $query->execute();
   // We have to store this in an array, and then switch back to 'default' database
@@ -74,22 +93,27 @@ function _gnucbudget_sync_gnucash_transactions() {
   $rows = $result->fetchAll();
   db_set_active('default');
 
-  // Now create transaction entities for each fetched gnucash transaction, if
-  // one doesn't already exist.
-  foreach($rows as $row) {
-    $query = new EntityFieldQuery();
-    $query->entityCondition('entity_type', 'transaction')
-      ->fieldCondition('field_gnucash_guid', 'value', $row->guid, '=');
-    $results = $query->execute();
-    if (empty($results)) {
-      $entity = entity_create('transaction', array('type' => 'transaction'));
-      $entity->field_gnucash_guid = array(LANGUAGE_NONE => array(0 => array('value' => $row->guid)));
-      $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_ids_per_guid[$row->account_guid])));
-      $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $expense_account_id)));
-      $entity->field_description = array(LANGUAGE_NONE => array(0 => array('value' => $row->description)));
-      $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => $row->post_date)));
-      $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $row->amount)));
-      $entity->save();
+  if (!empty($rows)) {
+    $accounts_to_guids_map = _gnucbudget_get_budget_accounts_to_guids_map();
+    $expense_account_id = _guncbudget_get_expense_account_id();
+
+    // Now create transaction entities for each fetched gnucash transaction, if
+    // one doesn't already exist.
+    foreach($rows as $row) {
+      $query = new EntityFieldQuery();
+      $query->entityCondition('entity_type', 'transaction')
+        ->fieldCondition('field_gnucash_guid', 'value', $row->guid, '=');
+      $results = $query->execute();
+      if (empty($results)) {
+        $entity = entity_create('transaction', array('type' => 'transaction'));
+        $entity->field_gnucash_guid = array(LANGUAGE_NONE => array(0 => array('value' => $row->guid)));
+        $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $accounts_to_guids_map[$row->account_guid])));
+        $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $expense_account_id)));
+        $entity->field_description = array(LANGUAGE_NONE => array(0 => array('value' => $row->description)));
+        $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => $row->post_date)));
+        $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $row->amount)));
+        $entity->save();
+      }
     }
   }
 }
