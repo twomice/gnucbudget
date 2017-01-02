@@ -6,17 +6,44 @@
  */
 
 function gnucbudget_cron() {
-  /* FIXME: on cron, take care of these tasks:
-   * 1. import new gnucash accounts to GnuCash Account entities.
-   * 2. import transactions/splits for GnuCash accounts having an Account entity.
-   * 3. do "quick" balance calculation for all accounts.
-   * 4. If it's time, perform account resets.
-   * 5. If it's time, perform allotments.
-   */
+  // On cron, take care of these tasks:
+  // 1. import new gnucash accounts to GnuCash Account entities.
+  _gnucbudget_sync_gnucash_accounts();
+  // 2. import transactions/splits for GnuCash accounts having an Account entity.
+  _gnucbudget_sync_gnucash_transactions();
+  // 3. do "quick" balance calculation for all accounts.
+  _gnucbudget_balance_accounts();
+  // 4. If it's time, perform account resets.
+  _gnucbudget_reset_accounts();
+  // 5. If it's time, perform allotments.
+  _gnucbudget_allot_accounts();
 }
 
 function gnucbudget_init() {
 }
+
+function _gnucbudget_balance_accounts() {
+  $account_ids = _gnucbudget_get_budget_accounts_to_guids_map();
+  foreach ($account_ids as $account_id) {
+    _gnucbudget_balance_account($account_id);
+  }
+  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
+}
+
+function _gnucbudget_balance_account($account_id) {
+  // NEXT TODO: create basic english rules for balancing an account.
+  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
+}
+
+
+function _gnucbudget_reset_accounts() {
+  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
+}
+
+function _gnucbudget_allot_accounts() {
+  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
+}
+
 
 /**
  * Get a module variable value.
@@ -29,6 +56,7 @@ function gnucbudget_init() {
  */
 function _gnucbudget_var_get($key) {
   $vars = array(
+    'gnucbudget_transaction_date_min' => '2016-12-01',
     'gnucbudget_transaction_history_months_max' => '6',
   );
   
@@ -38,18 +66,14 @@ function _gnucbudget_var_get($key) {
 function _gnucbudget_get_budget_accounts_to_guids_map() {
   static $accounts_to_guids_map;
   if (!isset($accounts_to_guids_map)) {
-    // Get all budget accounts for matching with their gnucash accounts
     $accounts_to_guids_map = array();
-    $query = new EntityFieldQuery();
-    $query->entityCondition('entity_type', 'account')
-      ->fieldCondition('field_type', 'value', 'budget', '=');
-    $results = $query->execute();
-    foreach (array_keys($results['account']) as $entity_id) {
-      $account = entity_load_single('account', $entity_id);
-      $gnucash_account_id = $account->field_gnucash_account[LANGUAGE_NONE][0]['target_id'];
-      $gnucash_account = entity_load_single('gnucash_account', $gnucash_account_id);
-      $gnucash_account_guid = $gnucash_account->field_gnucash_guid[LANGUAGE_NONE][0]['value'];
-      $accounts_to_guids_map[$gnucash_account_guid] = $entity_id;
+    $view_object = views_get_view('gnucbudget_budget_accounts_to_guids_map');
+    $view_object->set_display("default");
+    $view_object->pre_execute();
+    $view_object->execute();
+    $results = $view_object->result;
+    foreach ($results as $result) {
+      $accounts_to_guids_map[$result->field_field_gnucash_guid[0]['raw']['value']] = $result->id;
     }
   }
   return $accounts_to_guids_map;
@@ -84,10 +108,12 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
   $query->join('splits', 's', "s.tx_guid = t.guid");
   $query->join('accounts', 'a', "s.account_guid = a.guid AND a.account_type = :type", array(':type' => 'EXPENSE'));
   $query->fields('s', array('account_guid'))
-      ->fields('t', array('post_date', 'description', 'guid'));
-  $query->where('date_format(t.post_date, "%Y-%m") = :month', array(':month' => $month));
+      ->fields('t', array('post_date', 'description', 'guid'))
+      ->condition('t.post_date', _gnucbudget_var_get('gnucbudget_transaction_date_min'), '>=');
+  $query->where("date_format(t.post_date, '%Y-%m') = :month", array(':month' => $month));
   $query->addExpression('round(s.value_num / s.value_denom, 2)', 'amount');
   $result = $query->execute();
+
   // We have to store this in an array, and then switch back to 'default' database
   // before manipulating Drupal entities based on this data.
   $rows = $result->fetchAll();
