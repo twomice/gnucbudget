@@ -84,9 +84,11 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'module' => 'number',
     'settings' => array(
       'decimal_separator' => '.',
+      'precision' => 10,
+      'scale' => 2,
     ),
     'translatable' => 0,
-    'type' => 'number_float',
+    'type' => 'number_decimal',
   );
 
   // Exported field_base: 'field_amount'.
@@ -101,9 +103,11 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'module' => 'number',
     'settings' => array(
       'decimal_separator' => '.',
+      'precision' => 10,
+      'scale' => 2,
     ),
     'translatable' => 0,
-    'type' => 'number_float',
+    'type' => 'number_decimal',
   );
 
   // Exported field_base: 'field_description'.
@@ -139,9 +143,11 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'module' => 'number',
     'settings' => array(
       'decimal_separator' => '.',
+      'precision' => 10,
+      'scale' => 2,
     ),
     'translatable' => 0,
-    'type' => 'number_float',
+    'type' => 'number_decimal',
   );
 
   // Exported field_base: 'field_from'.
@@ -161,6 +167,11 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'settings' => array(
       'handler' => 'base',
       'handler_settings' => array(
+        'behaviors' => array(
+          'views-select-list' => array(
+            'status' => 1,
+          ),
+        ),
         'sort' => array(
           'direction' => 'ASC',
           'property' => 'title',
@@ -380,9 +391,11 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'module' => 'number',
     'settings' => array(
       'decimal_separator' => '.',
+      'precision' => 10,
+      'scale' => 2,
     ),
     'translatable' => 0,
-    'type' => 'number_float',
+    'type' => 'number_decimal',
   );
 
   // Exported field_base: 'field_to'.
@@ -402,6 +415,11 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'settings' => array(
       'handler' => 'base',
       'handler_settings' => array(
+        'behaviors' => array(
+          'views-select-list' => array(
+            'status' => 1,
+          ),
+        ),
         'sort' => array(
           'direction' => 'ASC',
           'property' => 'title',
@@ -438,6 +456,33 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     ),
     'translatable' => 0,
     'type' => 'list_boolean',
+  );
+
+  // Exported field_base: 'field_transaction_type'.
+  $field_bases['field_transaction_type'] = array(
+    'active' => 1,
+    'cardinality' => 1,
+    'deleted' => 0,
+    'entity_types' => array(),
+    'field_name' => 'field_transaction_type',
+    'indexes' => array(
+      'value' => array(
+        0 => 'value',
+      ),
+    ),
+    'locked' => 0,
+    'module' => 'list',
+    'settings' => array(
+      'allowed_values' => array(
+        'gnucash' => 'gnucash',
+        'allotment' => 'allotment',
+        'reset' => 'reset',
+        'manual' => 'manual',
+      ),
+      'allowed_values_function' => '',
+    ),
+    'translatable' => 0,
+    'type' => 'list_text',
   );
 
   // Exported field_base: 'field_type'.

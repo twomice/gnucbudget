@@ -66,7 +66,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
           'thousand_separator' => '',
         ),
         'type' => 'number_decimal',
-        'weight' => 1,
+        'weight' => 9,
       ),
       'teaser' => array(
         'label' => 'above',
@@ -82,7 +82,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
     'settings' => array(
       'max' => '',
       'min' => 0,
-      'prefix' => '$',
+      'prefix' => '',
       'suffix' => '',
       'user_register_form' => FALSE,
     ),
@@ -91,7 +91,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'number',
       'settings' => array(),
       'type' => 'number',
-      'weight' => 1,
+      'weight' => 0,
     ),
   );
 
@@ -130,7 +130,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'options',
       'settings' => array(),
       'type' => 'options_select',
-      'weight' => 8,
+      'weight' => 7,
     ),
   );
 
@@ -173,7 +173,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
         'display_label' => 1,
       ),
       'type' => 'options_onoff',
-      'weight' => 7,
+      'weight' => 6,
     ),
   );
 
@@ -212,7 +212,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'options',
       'settings' => array(),
       'type' => 'options_select',
-      'weight' => 6,
+      'weight' => 5,
     ),
   );
 
@@ -341,7 +341,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'options',
       'settings' => array(),
       'type' => 'options_select',
-      'weight' => 0,
+      'weight' => 1,
     ),
   );
 
@@ -380,7 +380,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'options',
       'settings' => array(),
       'type' => 'options_select',
-      'weight' => 2,
+      'weight' => 1,
     ),
   );
 
@@ -401,7 +401,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
           'thousand_separator' => '',
         ),
         'type' => 'number_decimal',
-        'weight' => 3,
+        'weight' => 5,
       ),
       'teaser' => array(
         'label' => 'above',
@@ -417,7 +417,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
     'settings' => array(
       'max' => '',
       'min' => '',
-      'prefix' => '$',
+      'prefix' => '',
       'suffix' => '',
       'user_register_form' => FALSE,
     ),
@@ -426,7 +426,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'number',
       'settings' => array(),
       'type' => 'number',
-      'weight' => 4,
+      'weight' => 3,
     ),
   );
 
@@ -481,7 +481,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
         'year_range' => '-3:+3',
       ),
       'type' => 'date_text',
-      'weight' => 1,
+      'weight' => 0,
     ),
   );
 
@@ -502,7 +502,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
           'thousand_separator' => '',
         ),
         'type' => 'number_decimal',
-        'weight' => 2,
+        'weight' => 4,
       ),
       'teaser' => array(
         'label' => 'above',
@@ -518,7 +518,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
     'settings' => array(
       'max' => '',
       'min' => '',
-      'prefix' => '$',
+      'prefix' => '',
       'suffix' => '',
       'user_register_form' => FALSE,
     ),
@@ -527,7 +527,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'number',
       'settings' => array(),
       'type' => 'number',
-      'weight' => 3,
+      'weight' => 2,
     ),
   );
 
@@ -589,7 +589,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
           'thousand_separator' => '',
         ),
         'type' => 'number_decimal',
-        'weight' => 0,
+        'weight' => 8,
       ),
       'teaser' => array(
         'label' => 'above',
@@ -601,10 +601,10 @@ function feature_gnucash_budgeting_field_default_field_instances() {
     'entity_type' => 'transaction',
     'field_name' => 'field_amount',
     'label' => 'Amount',
-    'required' => 1,
+    'required' => 0,
     'settings' => array(
       'max' => '',
-      'min' => '',
+      'min' => 0,
       'prefix' => '',
       'suffix' => '',
       'user_register_form' => FALSE,
@@ -874,6 +874,47 @@ function feature_gnucash_budgeting_field_default_field_instances() {
     ),
   );
 
+  // Exported field_instance: 'transaction-transaction-field_transaction_type'.
+  $field_instances['transaction-transaction-field_transaction_type'] = array(
+    'bundle' => 'transaction',
+    'default_value' => array(
+      0 => array(
+        'value' => 'gnucash',
+      ),
+    ),
+    'deleted' => 0,
+    'description' => '',
+    'display' => array(
+      'default' => array(
+        'label' => 'above',
+        'module' => 'list',
+        'settings' => array(),
+        'type' => 'list_default',
+        'weight' => 7,
+      ),
+      'teaser' => array(
+        'label' => 'above',
+        'settings' => array(),
+        'type' => 'hidden',
+        'weight' => 0,
+      ),
+    ),
+    'entity_type' => 'transaction',
+    'field_name' => 'field_transaction_type',
+    'label' => 'Transaction type',
+    'required' => 0,
+    'settings' => array(
+      'user_register_form' => FALSE,
+    ),
+    'widget' => array(
+      'active' => 1,
+      'module' => 'options',
+      'settings' => array(),
+      'type' => 'options_select',
+      'weight' => 7,
+    ),
+  );
+
   // Translatables
   // Included for use with string extractors like potx.
   t('Account');
@@ -896,6 +937,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
   t('Starting balance');
   t('To');
   t('Totaled');
+  t('Transaction type');
   t('Type');
   t('When this account is reset, it will be reset to an amount equal to "Allotment" times this number. Must be between 0 and 1.');
 
