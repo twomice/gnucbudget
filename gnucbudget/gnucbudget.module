@@ -126,6 +126,8 @@ function _gnucbudget_balance_account($account_id, $month = '') {
   $balance->field_ending_balance = array(LANGUAGE_NONE => array(0 => array('value' => $ending_balance)));
   $balance->save();
   
+  // Mark all transactions as "totaled" in this month/account.
+  _gnucbudget_mark_totaled($account_id, $month);
 
   // If this is a month in the past, clear certain data from all following months,
   // and calculate balance for the next month.
@@ -134,8 +136,42 @@ function _gnucbudget_balance_account($account_id, $month = '') {
     _gnucbudget_clear_account_future($account_id, $next_month, TRUE);
     _gnucbudget_balance_account($account_id, $next_month);
   }
-  // NEXT TODO: create basic english rules for balancing an account.
-  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
+}
+
+/**
+ * For a given month and account, mark all transactions as 'totaled'.
+ * 
+ * @param <type> $account_id
+ * @param <type> $month
+ */
+function _gnucbudget_mark_totaled($account_id, $month) {
+  $entities = array();
+  // Get transaction where month=$month and from=$account_id.
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'transaction')
+    ->fieldCondition('field_post_date', 'value', "{$month}-01", '>=')
+    ->fieldCondition('field_totaled', 'value', 0, '=')
+    ->fieldCondition('field_from', 'target_id', $account_id, '=');
+  $result = $query->execute();
+  if (!empty($result['transaction'])) {
+    $entities = array_merge($entities, entity_load('transaction', array_keys($result['transaction'])));
+  }
+
+  // Get transaction where month=$month and to=$account_id.
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'transaction')
+    ->fieldCondition('field_post_date', 'value', "{$month}-01", '>=')
+    ->fieldCondition('field_totaled', 'value', 0, '=')
+    ->fieldCondition('field_to', 'target_id', $account_id, '=');
+  $result = $query->execute();
+  if (!empty($result['transaction'])) {
+    $entities = array_merge($entities, entity_load('transaction', array_keys($result['transaction'])));
+  }
+
+  foreach ($entities as $entity) {
+    $entity->field_totaled = array(LANGUAGE_NONE => array(0 => array('value' => 1)));
+    $entity->save();
+  }
 }
 
 /**
@@ -150,14 +186,14 @@ function _gnucbudget_do_reset_and_allot($account_id, $month) {
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'transaction')
     ->fieldCondition('field_post_date', 'value', "{$month}-01", '>=')
-    ->fieldCondition('field_transaction_type', 'value', array('reset'), '=');
+    ->fieldCondition('field_transaction_type', 'value', 'reset', '=');
   $results = $query->execute();
   if (empty($results['transaction'])) {
     $needs_action = TRUE;
     $query = new EntityFieldQuery();
     $query->entityCondition('entity_type', 'transaction')
       ->fieldCondition('field_post_date', 'value', "{$month}-01", '>=')
-      ->fieldCondition('field_transaction_type', 'value', array('allotment'), '=');
+      ->fieldCondition('field_transaction_type', 'value', 'allotment', '=');
     $results = $query->execute();
     if (empty($results['transaction'])) {
       $needs_action = TRUE;
