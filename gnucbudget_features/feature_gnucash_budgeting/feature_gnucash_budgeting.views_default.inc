@@ -22,7 +22,7 @@ function feature_gnucash_budgeting_views_default_views() {
 
   /* Display: Master */
   $handler = $view->new_display('default', 'Master', 'default');
-  $handler->display->display_options['title'] = 'All accounts';
+  $handler->display->display_options['title'] = 'Accounts';
   $handler->display->display_options['use_more_always'] = FALSE;
   $handler->display->display_options['access']['type'] = 'none';
   $handler->display->display_options['cache']['type'] = 'none';
@@ -32,18 +32,31 @@ function feature_gnucash_budgeting_views_default_views() {
   $handler->display->display_options['pager']['options']['items_per_page'] = '80';
   $handler->display->display_options['style_plugin'] = 'table';
   $handler->display->display_options['style_options']['columns'] = array(
+    'id' => 'id',
+    'edit_link' => 'edit_link',
     'title' => 'title',
     'field_gnucash_account' => 'field_gnucash_account',
     'field_type' => 'field_type',
-    'field_allot_from' => 'field_allot_from',
     'field_allotment' => 'field_allotment',
-    'field_is_reserved' => 'field_is_reserved',
-    'field_reset_factor' => 'field_reset_factor',
     'field_reset_frequency_months' => 'field_reset_frequency_months',
-    'id' => 'id',
+    'field_reset_factor' => 'field_reset_factor',
+    'field_allot_from' => 'field_allot_from',
+    'field_is_reserved' => 'field_is_reserved',
   );
   $handler->display->display_options['style_options']['default'] = 'title';
   $handler->display->display_options['style_options']['info'] = array(
+    'id' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'edit_link' => array(
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
     'title' => array(
       'sortable' => 1,
       'default_sort_order' => 'asc',
@@ -65,28 +78,7 @@ function feature_gnucash_budgeting_views_default_views() {
       'separator' => '',
       'empty_column' => 0,
     ),
-    'field_allot_from' => array(
-      'sortable' => 1,
-      'default_sort_order' => 'asc',
-      'align' => '',
-      'separator' => '',
-      'empty_column' => 0,
-    ),
     'field_allotment' => array(
-      'sortable' => 1,
-      'default_sort_order' => 'asc',
-      'align' => '',
-      'separator' => '',
-      'empty_column' => 0,
-    ),
-    'field_is_reserved' => array(
-      'sortable' => 1,
-      'default_sort_order' => 'asc',
-      'align' => '',
-      'separator' => '',
-      'empty_column' => 0,
-    ),
-    'field_reset_factor' => array(
       'sortable' => 1,
       'default_sort_order' => 'asc',
       'align' => '',
@@ -100,7 +92,21 @@ function feature_gnucash_budgeting_views_default_views() {
       'separator' => '',
       'empty_column' => 0,
     ),
-    'id' => array(
+    'field_reset_factor' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_allot_from' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_is_reserved' => array(
       'sortable' => 1,
       'default_sort_order' => 'asc',
       'align' => '',
@@ -152,13 +158,6 @@ function feature_gnucash_budgeting_views_default_views() {
     'thousand_separator' => '',
     'prefix_suffix' => 1,
   );
-  /* Field: Account: Allot from */
-  $handler->display->display_options['fields']['field_allot_from']['id'] = 'field_allot_from';
-  $handler->display->display_options['fields']['field_allot_from']['table'] = 'field_data_field_allot_from';
-  $handler->display->display_options['fields']['field_allot_from']['field'] = 'field_allot_from';
-  $handler->display->display_options['fields']['field_allot_from']['settings'] = array(
-    'link' => 0,
-  );
   /* Field: Account: Reset factor */
   $handler->display->display_options['fields']['field_reset_factor']['id'] = 'field_reset_factor';
   $handler->display->display_options['fields']['field_reset_factor']['table'] = 'field_data_field_reset_factor';
@@ -168,6 +167,13 @@ function feature_gnucash_budgeting_views_default_views() {
     'decimal_separator' => '.',
     'scale' => '2',
     'prefix_suffix' => 1,
+  );
+  /* Field: Account: Allot from */
+  $handler->display->display_options['fields']['field_allot_from']['id'] = 'field_allot_from';
+  $handler->display->display_options['fields']['field_allot_from']['table'] = 'field_data_field_allot_from';
+  $handler->display->display_options['fields']['field_allot_from']['field'] = 'field_allot_from';
+  $handler->display->display_options['fields']['field_allot_from']['settings'] = array(
+    'link' => 0,
   );
   /* Field: Account: Reserved */
   $handler->display->display_options['fields']['field_is_reserved']['id'] = 'field_is_reserved';
@@ -181,9 +187,272 @@ function feature_gnucash_budgeting_views_default_views() {
     'account' => 'account',
   );
 
-  /* Display: Page */
-  $handler = $view->new_display('page', 'Page', 'page');
-  $handler->display->display_options['path'] = 'gnucbudget-accounts';
+  /* Display: Accounts */
+  $handler = $view->new_display('page', 'Accounts', 'page');
+  $handler->display->display_options['path'] = 'gnucbudget/accounts/list';
+  $handler->display->display_options['menu']['type'] = 'default tab';
+  $handler->display->display_options['menu']['title'] = 'Accounts';
+  $handler->display->display_options['menu']['weight'] = '0';
+  $handler->display->display_options['menu']['name'] = 'management';
+  $handler->display->display_options['menu']['context'] = 0;
+  $handler->display->display_options['menu']['context_only_inline'] = 0;
+  $handler->display->display_options['tab_options']['weight'] = '0';
+
+  /* Display: Balances-Current */
+  $handler = $view->new_display('page', 'Balances-Current', 'page_1');
+  $handler->display->display_options['defaults']['title'] = FALSE;
+  $handler->display->display_options['title'] = 'Account Balances: Current';
+  $handler->display->display_options['defaults']['access'] = FALSE;
+  $handler->display->display_options['access']['type'] = 'perm';
+  $handler->display->display_options['defaults']['style_plugin'] = FALSE;
+  $handler->display->display_options['style_plugin'] = 'table';
+  $handler->display->display_options['style_options']['columns'] = array(
+    'title' => 'title',
+    'field_allotment' => 'field_allotment',
+    'field_ending_balance' => 'field_ending_balance',
+  );
+  $handler->display->display_options['style_options']['default'] = 'title';
+  $handler->display->display_options['style_options']['info'] = array(
+    'title' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_allotment' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_ending_balance' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+  );
+  $handler->display->display_options['defaults']['style_options'] = FALSE;
+  $handler->display->display_options['defaults']['row_plugin'] = FALSE;
+  $handler->display->display_options['defaults']['row_options'] = FALSE;
+  $handler->display->display_options['defaults']['relationships'] = FALSE;
+  /* Relationship: Entity Reference: Referencing entity */
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['id'] = 'reverse_field_account_balance';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['table'] = 'eck_account';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['field'] = 'reverse_field_account_balance';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['label'] = 'Balance';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['required'] = TRUE;
+  $handler->display->display_options['defaults']['fields'] = FALSE;
+  /* Field: Account: Title */
+  $handler->display->display_options['fields']['title']['id'] = 'title';
+  $handler->display->display_options['fields']['title']['table'] = 'eck_account';
+  $handler->display->display_options['fields']['title']['field'] = 'title';
+  $handler->display->display_options['fields']['title']['alter']['path'] = '/account/account/[id]';
+  /* Field: Account: Allotment */
+  $handler->display->display_options['fields']['field_allotment']['id'] = 'field_allotment';
+  $handler->display->display_options['fields']['field_allotment']['table'] = 'field_data_field_allotment';
+  $handler->display->display_options['fields']['field_allotment']['field'] = 'field_allotment';
+  $handler->display->display_options['fields']['field_allotment']['settings'] = array(
+    'thousand_separator' => ',',
+    'decimal_separator' => '.',
+    'scale' => '2',
+    'prefix_suffix' => 1,
+  );
+  /* Field: Balance: Ending balance */
+  $handler->display->display_options['fields']['field_ending_balance']['id'] = 'field_ending_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['table'] = 'field_data_field_ending_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['field'] = 'field_ending_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['label'] = 'Remaining balance';
+  $handler->display->display_options['fields']['field_ending_balance']['settings'] = array(
+    'thousand_separator' => '',
+    'decimal_separator' => '.',
+    'scale' => '2',
+    'prefix_suffix' => 1,
+  );
+  $handler->display->display_options['defaults']['filter_groups'] = FALSE;
+  $handler->display->display_options['defaults']['filters'] = FALSE;
+  /* Filter criterion: Account: account type */
+  $handler->display->display_options['filters']['type']['id'] = 'type';
+  $handler->display->display_options['filters']['type']['table'] = 'eck_account';
+  $handler->display->display_options['filters']['type']['field'] = 'type';
+  $handler->display->display_options['filters']['type']['value'] = array(
+    'account' => 'account',
+  );
+  /* Filter criterion: Balance: Month (field_month) */
+  $handler->display->display_options['filters']['field_month_value']['id'] = 'field_month_value';
+  $handler->display->display_options['filters']['field_month_value']['table'] = 'field_data_field_month';
+  $handler->display->display_options['filters']['field_month_value']['field'] = 'field_month_value';
+  $handler->display->display_options['filters']['field_month_value']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['filters']['field_month_value']['expose']['operator_id'] = 'field_month_value_op';
+  $handler->display->display_options['filters']['field_month_value']['expose']['label'] = 'Month (field_month)';
+  $handler->display->display_options['filters']['field_month_value']['expose']['operator'] = 'field_month_value_op';
+  $handler->display->display_options['filters']['field_month_value']['expose']['identifier'] = 'field_month_value';
+  $handler->display->display_options['filters']['field_month_value']['expose']['remember_roles'] = array(
+    2 => '2',
+    1 => 0,
+    3 => 0,
+  );
+  $handler->display->display_options['filters']['field_month_value']['granularity'] = 'month';
+  $handler->display->display_options['filters']['field_month_value']['default_date'] = 'now';
+  $handler->display->display_options['path'] = 'gnucbudget/accounts/balances';
+  $handler->display->display_options['menu']['type'] = 'tab';
+  $handler->display->display_options['menu']['title'] = 'Balances';
+  $handler->display->display_options['menu']['weight'] = '0';
+  $handler->display->display_options['menu']['context'] = 0;
+  $handler->display->display_options['menu']['context_only_inline'] = 0;
+
+  /* Display: Balances-Historical */
+  $handler = $view->new_display('page', 'Balances-Historical', 'page_2');
+  $handler->display->display_options['defaults']['title'] = FALSE;
+  $handler->display->display_options['title'] = 'Account Balances: History';
+  $handler->display->display_options['defaults']['style_plugin'] = FALSE;
+  $handler->display->display_options['style_plugin'] = 'table';
+  $handler->display->display_options['style_options']['columns'] = array(
+    'title' => 'title',
+    'field_month' => 'field_month',
+    'field_starting_balance' => 'field_starting_balance',
+    'field_ending_balance' => 'field_ending_balance',
+  );
+  $handler->display->display_options['style_options']['default'] = 'title';
+  $handler->display->display_options['style_options']['info'] = array(
+    'title' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_month' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_starting_balance' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+    'field_ending_balance' => array(
+      'sortable' => 1,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+      'empty_column' => 0,
+    ),
+  );
+  $handler->display->display_options['defaults']['style_options'] = FALSE;
+  $handler->display->display_options['defaults']['row_plugin'] = FALSE;
+  $handler->display->display_options['defaults']['row_options'] = FALSE;
+  $handler->display->display_options['defaults']['relationships'] = FALSE;
+  /* Relationship: Entity Reference: Referencing entity */
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['id'] = 'reverse_field_account_balance';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['table'] = 'eck_account';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['field'] = 'reverse_field_account_balance';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['label'] = 'Balance';
+  $handler->display->display_options['relationships']['reverse_field_account_balance']['required'] = TRUE;
+  $handler->display->display_options['defaults']['fields'] = FALSE;
+  /* Field: Account: Title */
+  $handler->display->display_options['fields']['title']['id'] = 'title';
+  $handler->display->display_options['fields']['title']['table'] = 'eck_account';
+  $handler->display->display_options['fields']['title']['field'] = 'title';
+  /* Field: Balance: Month */
+  $handler->display->display_options['fields']['field_month']['id'] = 'field_month';
+  $handler->display->display_options['fields']['field_month']['table'] = 'field_data_field_month';
+  $handler->display->display_options['fields']['field_month']['field'] = 'field_month';
+  $handler->display->display_options['fields']['field_month']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['fields']['field_month']['settings'] = array(
+    'format_type' => 'short_date',
+    'fromto' => 'both',
+    'multiple_number' => '',
+    'multiple_from' => '',
+    'multiple_to' => '',
+    'show_remaining_days' => 0,
+  );
+  /* Field: Balance: Starting balance */
+  $handler->display->display_options['fields']['field_starting_balance']['id'] = 'field_starting_balance';
+  $handler->display->display_options['fields']['field_starting_balance']['table'] = 'field_data_field_starting_balance';
+  $handler->display->display_options['fields']['field_starting_balance']['field'] = 'field_starting_balance';
+  $handler->display->display_options['fields']['field_starting_balance']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['fields']['field_starting_balance']['settings'] = array(
+    'thousand_separator' => '',
+    'decimal_separator' => '.',
+    'scale' => '2',
+    'prefix_suffix' => 1,
+  );
+  /* Field: Balance: Ending balance */
+  $handler->display->display_options['fields']['field_ending_balance']['id'] = 'field_ending_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['table'] = 'field_data_field_ending_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['field'] = 'field_ending_balance';
+  $handler->display->display_options['fields']['field_ending_balance']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['defaults']['filter_groups'] = FALSE;
+  $handler->display->display_options['defaults']['filters'] = FALSE;
+  /* Filter criterion: Account: account type */
+  $handler->display->display_options['filters']['type']['id'] = 'type';
+  $handler->display->display_options['filters']['type']['table'] = 'eck_account';
+  $handler->display->display_options['filters']['type']['field'] = 'type';
+  $handler->display->display_options['filters']['type']['value'] = array(
+    'account' => 'account',
+  );
+  $handler->display->display_options['filters']['type']['group'] = 1;
+  /* Filter criterion: Balance: Account (field_account) */
+  $handler->display->display_options['filters']['field_account_target_id']['id'] = 'field_account_target_id';
+  $handler->display->display_options['filters']['field_account_target_id']['table'] = 'field_data_field_account';
+  $handler->display->display_options['filters']['field_account_target_id']['field'] = 'field_account_target_id';
+  $handler->display->display_options['filters']['field_account_target_id']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['filters']['field_account_target_id']['exposed'] = TRUE;
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['operator_id'] = 'field_account_target_id_op';
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['label'] = 'Account (field_account)';
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['use_operator'] = TRUE;
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['operator'] = 'field_account_target_id_op';
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['identifier'] = 'field_account_target_id';
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['multiple'] = TRUE;
+  $handler->display->display_options['filters']['field_account_target_id']['expose']['remember_roles'] = array(
+    2 => '2',
+    1 => 0,
+    3 => 0,
+  );
+  /* Filter criterion: Balance: Month (field_month) */
+  $handler->display->display_options['filters']['field_month_value']['id'] = 'field_month_value';
+  $handler->display->display_options['filters']['field_month_value']['table'] = 'field_data_field_month';
+  $handler->display->display_options['filters']['field_month_value']['field'] = 'field_month_value';
+  $handler->display->display_options['filters']['field_month_value']['relationship'] = 'reverse_field_account_balance';
+  $handler->display->display_options['filters']['field_month_value']['exposed'] = TRUE;
+  $handler->display->display_options['filters']['field_month_value']['expose']['operator_id'] = 'field_month_value_op';
+  $handler->display->display_options['filters']['field_month_value']['expose']['label'] = 'Month (field_month)';
+  $handler->display->display_options['filters']['field_month_value']['expose']['use_operator'] = TRUE;
+  $handler->display->display_options['filters']['field_month_value']['expose']['operator'] = 'field_month_value_op';
+  $handler->display->display_options['filters']['field_month_value']['expose']['identifier'] = 'field_month_value';
+  $handler->display->display_options['filters']['field_month_value']['expose']['remember_roles'] = array(
+    2 => '2',
+    1 => 0,
+    3 => 0,
+  );
+  $handler->display->display_options['filters']['field_month_value']['granularity'] = 'month';
+  $handler->display->display_options['path'] = 'gnucbudget/accounts/balances-history';
+  $handler->display->display_options['menu']['type'] = 'tab';
+  $handler->display->display_options['menu']['title'] = 'HIstory';
+  $handler->display->display_options['menu']['weight'] = '0';
+  $handler->display->display_options['menu']['context'] = 0;
+  $handler->display->display_options['menu']['context_only_inline'] = 0;
+
+  /* Display: Parent */
+  $handler = $view->new_display('page', 'Parent', 'page_3');
+  $handler->display->display_options['path'] = 'gnucbudget/accounts';
+  $handler->display->display_options['menu']['type'] = 'normal';
+  $handler->display->display_options['menu']['title'] = 'Accounts';
+  $handler->display->display_options['menu']['weight'] = '0';
+  $handler->display->display_options['menu']['name'] = 'management';
+  $handler->display->display_options['menu']['context'] = 0;
+  $handler->display->display_options['menu']['context_only_inline'] = 0;
+  $handler->display->display_options['tab_options']['weight'] = '0';
   $export['gnucbudget_accounts'] = $view;
 
   $view = new view();
@@ -385,6 +654,11 @@ function feature_gnucash_budgeting_views_default_views() {
   $handler->display->display_options['fields']['id']['table'] = 'eck_transaction';
   $handler->display->display_options['fields']['id']['field'] = 'id';
   $handler->display->display_options['fields']['id']['alter']['make_link'] = TRUE;
+  $handler->display->display_options['fields']['id']['separator'] = '';
+  $handler->display->display_options['filter_groups']['groups'] = array(
+    1 => 'AND',
+    2 => 'OR',
+  );
   /* Filter criterion: Transaction: transaction type */
   $handler->display->display_options['filters']['type']['id'] = 'type';
   $handler->display->display_options['filters']['type']['table'] = 'eck_transaction';
@@ -447,6 +721,7 @@ function feature_gnucash_budgeting_views_default_views() {
   $handler->display->display_options['filters']['field_from_target_id']['id'] = 'field_from_target_id';
   $handler->display->display_options['filters']['field_from_target_id']['table'] = 'field_data_field_from';
   $handler->display->display_options['filters']['field_from_target_id']['field'] = 'field_from_target_id';
+  $handler->display->display_options['filters']['field_from_target_id']['group'] = 2;
   $handler->display->display_options['filters']['field_from_target_id']['exposed'] = TRUE;
   $handler->display->display_options['filters']['field_from_target_id']['expose']['operator_id'] = 'field_from_target_id_op';
   $handler->display->display_options['filters']['field_from_target_id']['expose']['label'] = 'From (field_from)';
@@ -463,6 +738,7 @@ function feature_gnucash_budgeting_views_default_views() {
   $handler->display->display_options['filters']['field_to_target_id']['id'] = 'field_to_target_id';
   $handler->display->display_options['filters']['field_to_target_id']['table'] = 'field_data_field_to';
   $handler->display->display_options['filters']['field_to_target_id']['field'] = 'field_to_target_id';
+  $handler->display->display_options['filters']['field_to_target_id']['group'] = 2;
   $handler->display->display_options['filters']['field_to_target_id']['exposed'] = TRUE;
   $handler->display->display_options['filters']['field_to_target_id']['expose']['operator_id'] = 'field_to_target_id_op';
   $handler->display->display_options['filters']['field_to_target_id']['expose']['label'] = 'To (field_to)';
@@ -478,7 +754,13 @@ function feature_gnucash_budgeting_views_default_views() {
 
   /* Display: Page */
   $handler = $view->new_display('page', 'Page', 'page');
-  $handler->display->display_options['path'] = 'gnucbudget-transactions';
+  $handler->display->display_options['path'] = 'gnucbudget/transactions';
+  $handler->display->display_options['menu']['type'] = 'normal';
+  $handler->display->display_options['menu']['title'] = 'Transactions';
+  $handler->display->display_options['menu']['weight'] = '0';
+  $handler->display->display_options['menu']['name'] = 'management';
+  $handler->display->display_options['menu']['context'] = 0;
+  $handler->display->display_options['menu']['context_only_inline'] = 0;
   $export['gnucbudget_transactions'] = $view;
 
   return $export;
