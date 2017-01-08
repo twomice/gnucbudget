@@ -13,10 +13,6 @@ function gnucbudget_cron() {
   _gnucbudget_sync_gnucash_transactions();
   // 3. do "quick" balance calculation for all accounts.
   _gnucbudget_balance_accounts();
-  // 4. If it's time, perform account resets.
-  _gnucbudget_reset_accounts();
-  // 5. If it's time, perform allotments.
-  _gnucbudget_allot_accounts();
 }
 
 function gnucbudget_init() {
@@ -24,10 +20,53 @@ function gnucbudget_init() {
 
 function _gnucbudget_balance_accounts() {
   $account_ids = _gnucbudget_get_budget_accounts_to_guids_map();
+  $post_dates = array();
   foreach ($account_ids as $account_id) {
-    _gnucbudget_balance_account($account_id);
+    // For each account, find the oldest transaction which is not totaled. If
+    // found, balance the account starting with that month.
+    // First get the oldest not-totaled transaction where account is the 'from' account.
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'transaction')
+      ->fieldCondition('field_totaled', 'value', 0, '=')
+      ->fieldCondition('field_from', 'target_id', $account_id, '=')
+      ->fieldOrderBy('field_post_date', 'value', 'ASC');
+    $results = $query->execute();
+    if (!empty($results['transaction'])) {
+      $transaction_result = reset($results['transaction']);
+      $transaction_id = $transaction_result->id;
+      $transactions = entity_load('transaction', array($transaction_id));
+      $transaction = $transactions[$transaction_id];
+      $items = field_get_items('transaction', $transaction, 'field_post_date');
+      $post_dates[] = strtotime($items[0]['value']);
+    }
+
+    // Next get the oldest not-totaled transaction where account is the 'to' account.
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'transaction')
+      ->fieldCondition('field_totaled', 'value', 0, '=')
+      ->fieldCondition('field_to', 'target_id', $account_id, '=')
+      ->fieldOrderBy('field_post_date', 'value', 'ASC');
+    $results = $query->execute();
+    if (!empty($results['transaction'])) {
+      $transaction_result = reset($results['transaction']);
+      $transaction_id = $transaction_result->id;
+      $transactions = entity_load('transaction', array($transaction_id));
+      $transaction = $transactions[$transaction_id];
+      $items = field_get_items('transaction', $transaction, 'field_post_date');
+      $post_dates[] = strtotime($items[0]['value']);
+    }
+    // If there are any not-is_totaled transactions, re-balance this account
+    // starting with the month of the oldest of those transactions.
+    if (!empty($post_dates)) {
+      $oldest_post_month = date('Y-m', min($post_dates));
+      _gnucbudget_balance_account($account_id, $oldest_post_month);
+    }
+    // If the aren't any not-is_totaled transactions, re-balance this account
+    // for the current month.
+    else {
+      _gnucbudget_balance_account($account_id);
+    }
   }
-  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
 }
 
 /**
@@ -49,8 +88,8 @@ function _gnucbudget_balance_accounts() {
  *   in the month, writing this difference to the ending balance.
  * - Mark all transactions for the account in the month as totalled.
  * - Delete any existing balance records for months following the given month.
- * - If current month is greater than $month, call this function again for the
- *   following month.
+ * - If $month is older than current month, call this function again for the
+ *   subsequent month.
  *
  * @param Int $account_id Entity ID for an Account entity.
  * @param String $month A month in the form of 'YYYY-MM'; balancing will start
@@ -90,7 +129,6 @@ function _gnucbudget_balance_account($account_id, $month = '') {
       $entity = entity_create('balance', array('type' => 'balance'));
       $entity->field_month = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
       $entity->field_account = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
-      dsm($previous_balance_ending, "saving \$previous_balance_ending as \$starting_balance for month $month on ". __LINE__);
       $entity->field_starting_balance = array(LANGUAGE_NONE => array(0 => array('value' => $previous_balance_ending)));
       $entity->save();
     }
@@ -101,7 +139,7 @@ function _gnucbudget_balance_account($account_id, $month = '') {
       $entity = entity_create('balance', array('type' => 'balance'));
       $entity->field_month = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
       $entity->field_account = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
-      dsm($previous_balance_ending, "saving \$previous_balance_ending for month $month on ". __LINE__);
+      $entity->field_starting_balance = array(LANGUAGE_NONE => array(0 => array('value' => 0)));
       $entity->field_ending_balance = array(LANGUAGE_NONE => array(0 => array('value' => 0)));
       $entity->save();
     }
@@ -116,9 +154,9 @@ function _gnucbudget_balance_account($account_id, $month = '') {
   // this account/month, if none exist already.
   _gnucbudget_do_reset_and_allot($account_id, $month);
 
-  // Total all transactions into this account.
-  // Total all transactions out of this account.
+  // Total all transactions into this account (where this account is "to").
   $total_in = _gnucbudget_sum_account_month($account_id, 'to', $month);
+  // Total all transactions out of this account (where this account "from").
   $total_out = _gnucbudget_sum_account_month($account_id, 'from', $month);
   // Add to starting balance and set ending balance.
   $ending_balance = ($starting_balance + $total_in - $total_out);
@@ -175,82 +213,63 @@ function _gnucbudget_mark_totaled($account_id, $month) {
 }
 
 /**
- * For a given account and month, if there are no reset or allotment transactions,
- * perform them now.
+ * For a given account and month, delete and re-peform all reset and allotment
+ * transactions.
  *
  * @param String $account_id
  * @param String $month A month in the form of 'YYYY-MM'
  */
 function _gnucbudget_do_reset_and_allot($account_id, $month) {
-  $needs_action = FALSE;
-  $query = new EntityFieldQuery();
-  $query->entityCondition('entity_type', 'transaction')
-    ->fieldCondition('field_post_date', 'value', "{$month}-01", '>=')
-    ->fieldCondition('field_transaction_type', 'value', 'reset', '=');
-  $results = $query->execute();
-  if (empty($results['transaction'])) {
-    $needs_action = TRUE;
-    $query = new EntityFieldQuery();
-    $query->entityCondition('entity_type', 'transaction')
-      ->fieldCondition('field_post_date', 'value', "{$month}-01", '>=')
-      ->fieldCondition('field_transaction_type', 'value', 'allotment', '=');
-    $results = $query->execute();
-    if (empty($results['transaction'])) {
-      $needs_action = TRUE;
-    }
-  }
-  if ($needs_action) {
-    // First clear all reset and allotment transactions for this and future months.
-    _gnucbudget_clear_account_future($account_id, $month, FALSE);
+  // First clear all reset and allotment transactions for this and future months.
+  _gnucbudget_clear_account_future($account_id, $month, FALSE);
 
-    // Create reset transactions.
-    $accounts = entity_load('account', array($account_id));
-    $account = $accounts[$account_id];
-    $items = field_get_items('account', $account, 'field_allotment');
-    $allotment = floatval($items[0]['value']);
-    $items = field_get_items('account', $account, 'field_reset_frequency_months');
-    $reset_frequency_months = $items[0]['value'];
-    $items = field_get_items('account', $account, 'field_allot_from');
-    $alloting_account_id = $items[0]['target_id'];
+  // Create reset transactions.
+  $accounts = entity_load('account', array($account_id));
+  $account = $accounts[$account_id];
+  $items = field_get_items('account', $account, 'field_allotment');
+  $allotment = floatval($items[0]['value']);
+  $items = field_get_items('account', $account, 'field_reset_frequency_months');
+  $reset_frequency_months = $items[0]['value'];
+  $items = field_get_items('account', $account, 'field_allot_from');
+  $alloting_account_id = $items[0]['target_id'];
 
-    $balance = _gnucbudget_get_latest_balance($account_id, $month);
-    $items = field_get_items('balance', $balance, 'field_starting_balance');
-    $starting_balance = $items[0]['value'];
-    if ($reset_frequency_months == 1) {
-      // First, move any excess balance into General.
-      $zero_amount = ($starting_balance > 0 ? $starting_balance : 0);
+  $balance = _gnucbudget_get_latest_balance($account_id, $month);
+  $items = field_get_items('balance', $balance, 'field_starting_balance');
+  $starting_balance = $items[0]['value'];
+  if ($reset_frequency_months == 1) {
+    // First, move any excess balance into General.
+    $zero_amount = ($starting_balance > 0 ? $starting_balance : 0);
+    $entity = entity_create('transaction', array('type' => 'transaction'));
+    $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
+    $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $alloting_account_id)));
+    $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
+    $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $zero_amount)));
+    $entity->field_transaction_type = array(LANGUAGE_NONE => array(0 => array('value' => 'reset')));
+    $entity->save();
+
+    // Credit any "reset" amount into the budget account.
+    $items = field_get_items('account', $account, 'field_reset_factor');
+    $reset_factor = floatval($items[0]['value']);
+    $reset_max_amount = ($reset_factor * $allotment);
+    $reset_amount = min(array($starting_balance, $reset_max_amount));
+    if ($reset_amount) {
       $entity = entity_create('transaction', array('type' => 'transaction'));
-      $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
-      $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $alloting_account_id)));
+      $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $alloting_account_id)));
+      $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
       $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
-      $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $zero_amount)));
+      $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $reset_amount)));
       $entity->field_transaction_type = array(LANGUAGE_NONE => array(0 => array('value' => 'reset')));
       $entity->save();
-
-      // Credit any "reset" amount into the budget account.
-      $items = field_get_items('account', $account, 'field_reset_factor');
-      $reset_factor = floatval($items[0]['value']);
-      $reset_max_amount = (($reset_factor && $allotment) ? ($reset_factor * $allotment) : $allotment);
-      $reset_amount = min(array($starting_balance, $reset_max_amount));
-      if ($reset_amount) {
-        $entity = entity_create('transaction', array('type' => 'transaction'));
-        $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $alloting_account_id)));
-        $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
-        $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
-        $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $reset_amount)));
-        $entity->field_transaction_type = array(LANGUAGE_NONE => array(0 => array('value' => 'reset')));
-        $entity->save();
-      }
     }
-    // Create allotment transaction.
-    $entity = entity_create('transaction', array('type' => 'transaction'));
-    $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $alloting_account_id)));
-    $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
-    $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
-    $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $allotment)));
-    $entity->field_transaction_type = array(LANGUAGE_NONE => array(0 => array('value' => 'allotment')));
-    $entity->save();
   }
+  // Create allotment transaction.
+  $entity = entity_create('transaction', array('type' => 'transaction'));
+  $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $alloting_account_id)));
+  $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $account_id)));
+  $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => "{$month}-01")));
+  $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $allotment)));
+  $entity->field_transaction_type = array(LANGUAGE_NONE => array(0 => array('value' => 'allotment')));
+  $entity->save();
 }
 
 function _gnucbudget_sum_account_month($account_id, $position, $month) {
@@ -292,6 +311,8 @@ function _gnucbudget_sum_account_month($account_id, $position, $month) {
  * @param String $month A month in the form of 'YYYY-MM'; all balances, reset
  *          transactions, and allotment transactions in this month and following
  *          months will be deleted.
+ * @param Boolean $clear_balances Only remove balance records if this is TRUE
+ *          (default=TRUE).
  */
 function _gnucbudget_clear_account_future($account_id, $month, $clear_balances = TRUE) {
   // Remove for FROM account.
@@ -359,15 +380,6 @@ function _gnucbudget_get_latest_balance($account_id, $max_month, $min_month = NU
   return $previous_balance;
 }
 
-function _gnucbudget_reset_accounts() {
-  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
-}
-
-function _gnucbudget_allot_accounts() {
-  dsm('FIXME: '. __FUNCTION__ . ' not complete.');
-}
-
-
 /**
  * Get a module variable value.
  * FIXME: Currently using hard-coded variables. Change to using var_get() after
@@ -379,8 +391,8 @@ function _gnucbudget_allot_accounts() {
  */
 function _gnucbudget_var_get($key) {
   $vars = array(
-    'gnucbudget_balance_month_min' => '2016-10',
-    'gnucbudget_transaction_date_min' => '2016-12-01',
+    'gnucbudget_balance_month_min' => '2017-01',
+    'gnucbudget_transaction_date_min' => '2016-17-01',
     'gnucbudget_transaction_history_months_max' => '6',
   );
   
@@ -449,7 +461,14 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
 
     // Now create transaction entities for each fetched gnucash transaction, if
     // one doesn't already exist.
+    $existing_guids = array();
     foreach($rows as $row) {
+      if (empty($accounts_to_guids_map[$row->account_guid])) {
+        // Skip this row if the gnucash account is not mapped to one of our accounts.
+        continue;
+      }
+
+      $existing_guids[] = $row->guid;
       $query = new EntityFieldQuery();
       $query->entityCondition('entity_type', 'transaction')
         ->fieldCondition('field_gnucash_guid', 'value', $row->guid, '=');
@@ -466,6 +485,17 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
         $entity->save();
       }
     }
+    // Remove any Transaction entity records that don't exist in gnucash.
+    $query = new EntityFieldQuery();
+    $query->entityCondition('entity_type', 'transaction')
+      ->fieldCondition('field_gnucash_guid', 'value', $existing_guids, 'NOT IN');
+    $results = $query->execute();
+    if (!empty($results['transaction'])) {
+      entity_delete_multiple('transaction', array_keys($results['transaction']));
+    }
+    // FiXME: For any transactions that are deleted, we need to mark that month
+    // as needing recalculation. So maybe mark all transactions in that month
+    // as not-is_totaled?
   }
 }
 
