@@ -1,0 +1,23 @@
+/**
+ * CSS styles for public account balances page at gnucbudget/accounts/balances/public
+ */
+
+table.views-table {
+  width: auto;
+  font-size: 2em;
+}
+table.views-table tr{
+  background-color: transparent;
+}
+table.views-table tr td {
+  border: none;
+  border-top: 1px solid black;
+}
+
+td.gnucbudget-balance-negative {
+  color: #aaa;
+  text-decoration: line-through;
+}
+td.gnucbudget-balance-positive {
+  color: green;
+}
