@@ -6,18 +6,34 @@
  */
 
 function gnucbudget_cron() {
+  $stored_checksum = variable_get('gnucash_mysql_checksum_splits', '');
+  $new_checksum = _gnucbudget_get_mysql_table_checksum('splits');
+  if ($stored_checksum == $new_checksum) {
+    watchdog('gnucbudget', 'Cron: splits table is unchanged since last run; aborting.');
+    return;
+  }
   // On cron, take care of these tasks:
   // 1. import new gnucash accounts to GnuCash Account entities.
   _gnucbudget_sync_gnucash_accounts();
   // 2. import transactions/splits for GnuCash accounts having an Account entity.
   _gnucbudget_sync_gnucash_transactions();
-  // 3. do "quick" balance calculation for all accounts.
+  // 3. perform balance calculation for all accounts.
   _gnucbudget_balance_accounts();
+
+  variable_set('gnucash_mysql_checksum_splits', $new_checksum);
+  watchdog('gnucbudget', 'Cron: changes detected in splits table; cron completd.');
 }
 
-function gnucbudget_init() {
+function _gnucbudget_get_mysql_table_checksum($table_name) {
+  $table_name = preg_replace('/[^0-9,a-z,A-Z$_]/', '', $table_name);
+  db_set_active('gnucash');
+  $query = db_query('checksum table '. $table_name, array(':tablename' => $table_name));
+  $record = $query->fetchAssoc();
+  $checksum = $record['Checksum'];
+  db_set_active('default');
+  return $checksum;
 }
-
+  
 function _gnucbudget_balance_accounts() {
   $account_ids = _gnucbudget_get_budget_accounts_to_guids_map();
   $post_dates = array();
