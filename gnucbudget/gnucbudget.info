@@ -2,8 +2,6 @@ name = GnuCash Budgeting
 description = Tools for budgeting with GnuCash
 package = GnuCash
 
-dependencies[] = views:views
-
 core = 7.x
-version = "7.x-1.0-beta1"
+version = "7.x-1.0-beta2"
 

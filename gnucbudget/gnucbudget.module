@@ -6,7 +6,7 @@
  */
 
 function gnucbudget_cron() {
-  $stored_checksum = variable_get('gnucash_mysql_checksum_splits', '');
+  $stored_checksum = variable_get('gnucbudget_mysql_checksum_splits', '');
   $new_checksum = _gnucbudget_get_mysql_table_checksum('splits');
   if ($stored_checksum == $new_checksum) {
     watchdog('gnucbudget', 'Cron: splits table is unchanged since last run; aborting.');
@@ -20,7 +20,7 @@ function gnucbudget_cron() {
   // 3. perform balance calculation for all accounts.
   _gnucbudget_balance_accounts();
 
-  variable_set('gnucash_mysql_checksum_splits', $new_checksum);
+  variable_set('gnucbudget_mysql_checksum_splits', $new_checksum);
   watchdog('gnucbudget', 'Cron: changes detected in splits table; cron completd.');
 }
 
@@ -459,9 +459,11 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
   $query = db_select('transactions', 't');
   $query->join('splits', 's', "s.tx_guid = t.guid");
   $query->join('accounts', 'a', "s.account_guid = a.guid AND a.account_type = :type", array(':type' => 'EXPENSE'));
-  $query->fields('s', array('account_guid'))
-      ->fields('t', array('post_date', 'description', 'guid'))
+  $query->fields('s', array('account_guid', 'memo'))
+      ->fields('t', array('post_date', 'description'))
       ->condition('t.post_date', _gnucbudget_var_get('gnucbudget_transaction_date_min'), '>=');
+  $query->addField('s', 'guid', 's_guid');
+  $query->addField('t', 'guid', 't_guid');
   $query->where("date_format(t.post_date, '%Y-%m') = :month", array(':month' => $month));
   $query->addExpression('round(s.value_num / s.value_denom, 2)', 'amount');
   $result = $query->execute();
@@ -484,17 +486,20 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
         continue;
       }
 
-      $existing_guids[] = $row->guid;
+      $existing_guids[] = $row->t_guid;
       $query = new EntityFieldQuery();
       $query->entityCondition('entity_type', 'transaction')
-        ->fieldCondition('field_gnucash_guid', 'value', $row->guid, '=');
+        ->fieldCondition('field_gnucash_guid', 'value', $row->t_guid, '=')
+        ->fieldCondition('field_gnucash_split_guid', 'value', $row->s_guid, '=');
       $results = $query->execute();
       if (empty($results)) {
+        $description = $row->description . (!empty($row->memo) ? " &#8649; {$row->memo}" : '');
         $entity = entity_create('transaction', array('type' => 'transaction'));
-        $entity->field_gnucash_guid = array(LANGUAGE_NONE => array(0 => array('value' => $row->guid)));
+        $entity->field_gnucash_guid = array(LANGUAGE_NONE => array(0 => array('value' => $row->t_guid)));
+        $entity->field_gnucash_split_guid = array(LANGUAGE_NONE => array(0 => array('value' => $row->s_guid)));
         $entity->field_from = array(LANGUAGE_NONE => array(0 => array('target_id' => $accounts_to_guids_map[$row->account_guid])));
         $entity->field_to = array(LANGUAGE_NONE => array(0 => array('target_id' => $expense_account_id)));
-        $entity->field_description = array(LANGUAGE_NONE => array(0 => array('value' => $row->description)));
+        $entity->field_description = array(LANGUAGE_NONE => array(0 => array('value' => $description, 'format' => 'full_html')));
         $entity->field_post_date = array(LANGUAGE_NONE => array(0 => array('value' => $row->post_date)));
         $entity->field_amount = array(LANGUAGE_NONE => array(0 => array('value' => $row->amount)));
         $entity->field_transaction_type = array(LANGUAGE_NONE => array(0 => array('value' => 'gnucash')));

@@ -644,7 +644,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
     'label' => 'Description',
     'required' => 0,
     'settings' => array(
-      'text_processing' => 0,
+      'text_processing' => 1,
       'user_register_form' => FALSE,
     ),
     'widget' => array(
@@ -734,6 +734,47 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       ),
       'type' => 'text_textfield',
       'weight' => 5,
+    ),
+  );
+
+  // Exported field_instance:
+  // 'transaction-transaction-field_gnucash_split_guid'.
+  $field_instances['transaction-transaction-field_gnucash_split_guid'] = array(
+    'bundle' => 'transaction',
+    'default_value' => NULL,
+    'deleted' => 0,
+    'description' => '',
+    'display' => array(
+      'default' => array(
+        'label' => 'above',
+        'module' => 'text',
+        'settings' => array(),
+        'type' => 'text_default',
+        'weight' => 9,
+      ),
+      'teaser' => array(
+        'label' => 'above',
+        'settings' => array(),
+        'type' => 'hidden',
+        'weight' => 0,
+      ),
+    ),
+    'entity_type' => 'transaction',
+    'field_name' => 'field_gnucash_split_guid',
+    'label' => 'GnuCash split guid',
+    'required' => 1,
+    'settings' => array(
+      'text_processing' => 0,
+      'user_register_form' => FALSE,
+    ),
+    'widget' => array(
+      'active' => 1,
+      'module' => 'text',
+      'settings' => array(
+        'size' => 60,
+      ),
+      'type' => 'text_textfield',
+      'weight' => 6,
     ),
   );
 
@@ -870,7 +911,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
         'display_label' => 1,
       ),
       'type' => 'options_onoff',
-      'weight' => 6,
+      'weight' => 7,
     ),
   );
 
@@ -911,7 +952,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
       'module' => 'options',
       'settings' => array(),
       'type' => 'options_select',
-      'weight' => 7,
+      'weight' => 8,
     ),
   );
 
@@ -926,6 +967,7 @@ function feature_gnucash_budgeting_field_default_field_instances() {
   t('From');
   t('GnuCash account');
   t('GnuCash guid');
+  t('GnuCash split guid');
   t('Last transfer');
   t('Last transfer used in calculating Balance. Calculated automatically -- never edit manually!');
   t('Month');

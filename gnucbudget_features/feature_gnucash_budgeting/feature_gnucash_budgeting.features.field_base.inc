@@ -241,6 +241,27 @@ function feature_gnucash_budgeting_field_default_field_bases() {
     'type' => 'text',
   );
 
+  // Exported field_base: 'field_gnucash_split_guid'.
+  $field_bases['field_gnucash_split_guid'] = array(
+    'active' => 1,
+    'cardinality' => 1,
+    'deleted' => 0,
+    'entity_types' => array(),
+    'field_name' => 'field_gnucash_split_guid',
+    'indexes' => array(
+      'format' => array(
+        0 => 'format',
+      ),
+    ),
+    'locked' => 0,
+    'module' => 'text',
+    'settings' => array(
+      'max_length' => 255,
+    ),
+    'translatable' => 0,
+    'type' => 'text',
+  );
+
   // Exported field_base: 'field_is_reserved'.
   $field_bases['field_is_reserved'] = array(
     'active' => 1,
