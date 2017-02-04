@@ -6,13 +6,18 @@
  */
 
 function gnucbudget_cron() {
-  $stored_checksum = variable_get('gnucbudget_mysql_checksum_splits', '');
+  // Catch-up baalances to current month, e.g., in case the current month's
+  // allotments and resets have not been done.
+  _gnucbudget_catchup_balances();
+
+  // Don't do anything more unless the gnucash transactions have changed.
+  $stored_checksum = _gnucbudget_var_get('gnucbudget_mysql_checksum_splits');
   $new_checksum = _gnucbudget_get_mysql_table_checksum('splits');
   if ($stored_checksum == $new_checksum) {
     watchdog('gnucbudget', 'Cron: splits table is unchanged since last run; aborting.');
     return;
   }
-  // On cron, take care of these tasks:
+  
   // 1. import new gnucash accounts to GnuCash Account entities.
   _gnucbudget_sync_gnucash_accounts();
   // 2. import transactions/splits for GnuCash accounts having an Account entity.
@@ -24,6 +29,41 @@ function gnucbudget_cron() {
   watchdog('gnucbudget', 'Cron: changes detected in splits table; cron completd.');
 }
 
+/**
+ * For each account, find the earliest month for which no transactions are made,
+ * and balance that account from that month onward. Star no more than
+ * `gnucbudget_transaction_history_months_max` months back.
+ */
+function _gnucbudget_catchup_balances() {
+  $account_ids = _gnucbudget_get_budget_accounts_to_guids_map();
+  $post_dates = array();
+  $now_month = date("Y-m");
+
+  foreach ($account_ids as $account_id) {
+    // For each account, start at `gnucbudget_transaction_history_months_max`
+    // months ago and find the first month with no balance record. If found,
+    // balance the account starting with that month.
+
+    // Current month.
+    $months_ago = _gnucbudget_var_get('gnucbudget_transaction_history_months_max');
+    $min_month = date("Y-m", strtotime("-{$months_ago} month"));
+    $balance = _gnucbudget_get_latest_balance($account_id, $now_month, $min_month);
+    $items = field_get_items('balance', $balance, 'field_month');
+    $last_balance_month = date('Y-m', strtotime($items[0]['value']));
+    // If the last balance month is not the current month, re-balance that
+    // account starting with the month after the last balance month.
+    if ($now_month > $last_balance_month) {
+      $next_month = date('Y-m', strtotime("$last_balance_month +1 month"));
+      _gnucbudget_balance_account($account_id, $next_month);
+    }
+  }
+}
+
+/**
+ * Get the mysql checksum of the given table in gnucash database.
+ * @param String $table_name
+ * @return String checksum
+ */
 function _gnucbudget_get_mysql_table_checksum($table_name) {
   $table_name = preg_replace('/[^0-9,a-z,A-Z$_]/', '', $table_name);
   db_set_active('gnucash');
@@ -33,7 +73,7 @@ function _gnucbudget_get_mysql_table_checksum($table_name) {
   db_set_active('default');
   return $checksum;
 }
-  
+
 function _gnucbudget_balance_accounts() {
   $account_ids = _gnucbudget_get_budget_accounts_to_guids_map();
   $post_dates = array();
@@ -165,7 +205,7 @@ function _gnucbudget_balance_account($account_id, $month = '') {
   $items = field_get_items('balance', $balance, 'field_starting_balance');
   $starting_balance = $items[0]['value'];
 
-  
+
   // Now we know which balance record to use. Apply resets and allotments for
   // this account/month, if none exist already.
   _gnucbudget_do_reset_and_allot($account_id, $month);
@@ -179,7 +219,7 @@ function _gnucbudget_balance_account($account_id, $month = '') {
 
   $balance->field_ending_balance = array(LANGUAGE_NONE => array(0 => array('value' => $ending_balance)));
   $balance->save();
-  
+
   // Mark all transactions as "totaled" in this month/account.
   _gnucbudget_mark_totaled($account_id, $month);
 
@@ -194,7 +234,7 @@ function _gnucbudget_balance_account($account_id, $month = '') {
 
 /**
  * For a given month and account, mark all transactions as 'totaled'.
- * 
+ *
  * @param <type> $account_id
  * @param <type> $month
  */
@@ -288,6 +328,17 @@ function _gnucbudget_do_reset_and_allot($account_id, $month) {
   $entity->save();
 }
 
+/**
+ * Calculate the total amount of transactions into or out of a given account
+ * in a given month.
+ *
+ * @param Int $account_id System ID of given account entity.
+ * @param String $position Either "to" (to total transactions into the account)
+ *  or "from" (to total transactions out of the account).
+ * @param String $month The month, in the format 'YYYY-MM'
+ *
+ * @return Float The requested total.
+ */
 function _gnucbudget_sum_account_month($account_id, $position, $month) {
   // Use db_select to get sum for a subset of transactions. I wish I didn't
   // have to do it this way, but the alternative (doing it with EntityFieldQuery)
@@ -365,8 +416,8 @@ function _gnucbudget_clear_account_future($account_id, $month, $clear_balances =
 }
 
 /**
- * For a given account and month, get the balance entity object for the previous
- * month's balance.
+ * For a given account and month, get the newest balance entity object within
+ * the given max/min criteria.
  *
  * @param Int $account_id Entity ID for an Account entity.
  * @param String $max_month A month in the form of 'YYYY-MM'; newest month that
@@ -407,14 +458,26 @@ function _gnucbudget_get_latest_balance($account_id, $max_month, $min_month = NU
  */
 function _gnucbudget_var_get($key) {
   $vars = array(
+    // Earliest month for which we're tracking balances.
     'gnucbudget_balance_month_min' => '2017-01',
+    // Earliest date on which we're importing gnucash transactions.
     'gnucbudget_transaction_date_min' => '2016-17-01',
+    // Maximum age in months for any imported gnucash transaction.
     'gnucbudget_transaction_history_months_max' => '6',
+    // Drupal variable: last mysql checksum for gnucash splits table.
+    'gnucbudget_mysql_checksum_splits' => variable_get('gnucbudget_mysql_checksum_splits', '')
   );
-  
+
   return $vars[$key];
 }
 
+/**
+ * Get an array mapping gnucash guids to account IDs.
+ *
+ * @staticvar Array $accounts_to_guids_map; static to avoid processing overhead.
+ *
+ * @return Array E.g., array('gnucash_guid_12345' => 1);
+ */
 function _gnucbudget_get_budget_accounts_to_guids_map() {
   static $accounts_to_guids_map;
   if (!isset($accounts_to_guids_map)) {
@@ -431,13 +494,21 @@ function _gnucbudget_get_budget_accounts_to_guids_map() {
   return $accounts_to_guids_map;
 }
 
-function _guncbudget_get_system_account_id($type) {
+/**
+ * Get the system ID of one account with account_type='expense' (there should
+ * be only one, but this function makes no attempt to ensure that's true).
+ *
+ * @staticvar Int $expense_account_id
+ *
+ * @return Int Expense account ID.
+ */
+function _guncbudget_get_expense_account_id() {
   static $expense_account_id;
   if (!isset($expense_account_id)) {
     // Get ID of 'Expense' account
     $query = new EntityFieldQuery();
     $query->entityCondition('entity_type', 'account')
-      ->fieldCondition('field_type', 'value', $type, '=');
+      ->fieldCondition('field_type', 'value', 'expense', '=');
     $results = $query->execute();
     $expense_account = reset($results['account']);
     $expense_account_id = $expense_account->id;
@@ -445,6 +516,10 @@ function _guncbudget_get_system_account_id($type) {
   return $expense_account_id;
 }
 
+/**
+ * Import all gnucash transactions for all months as far back as
+ * `gnucbudget_transaction_history_months_max`.
+ */
 function _gnucbudget_sync_gnucash_transactions() {
   // Get activities from gnucash database.
   for ($months_ago = _gnucbudget_var_get('gnucbudget_transaction_history_months_max'); $months_ago >= 0; $months_ago--) {
@@ -454,6 +529,12 @@ function _gnucbudget_sync_gnucash_transactions() {
 
 }
 
+/**
+ * For the given month, import all gnucash transactions, if the post date is
+ * `gnucbudget_transaction_date_min` or greater.
+ *
+ * @param String $month Month in the format 'YYYY-MM'
+ */
 function _gnucbudget_sync_gnucash_transactions_month($month) {
   db_set_active('gnucash');
   $query = db_select('transactions', 't');
@@ -475,7 +556,7 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
 
   if (!empty($rows)) {
     $accounts_to_guids_map = _gnucbudget_get_budget_accounts_to_guids_map();
-    $expense_account_id = _guncbudget_get_system_account_id('expense');
+    $expense_account_id = _guncbudget_get_expense_account_id();
 
     // Now create transaction entities for each fetched gnucash transaction, if
     // one doesn't already exist.
@@ -520,6 +601,9 @@ function _gnucbudget_sync_gnucash_transactions_month($month) {
   }
 }
 
+/**
+ * Import any gnucash accounts which have not been imported already.
+ */
 function _gnucbudget_sync_gnucash_accounts() {
   db_set_active('gnucash');
   $result = db_select('accounts', 'a')
